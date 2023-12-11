@@ -177,8 +177,15 @@ def run(
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
+                    expansion_factor = 0.2  # 20% expansion
+                    xyxy_expanded = [
+                        int(xyxy[0] - expansion_factor * (xyxy[2] - xyxy[0])),
+                        int(xyxy[1] - expansion_factor * (xyxy[3] - xyxy[1])),
+                        int(xyxy[2] + expansion_factor * (xyxy[2] - xyxy[0])),
+                        int(xyxy[3] + expansion_factor * (xyxy[3] - xyxy[1]))
+                    ]
                     if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        xywh = (xyxy2xywh(torch.tensor(xyxy_expanded).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
                         with open(f'{txt_path}.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
@@ -186,8 +193,8 @@ def run(
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                    plate_img = imc[int(xyxy[1]):int(xyxy[3]), int(xyxy[0]):int(xyxy[2])]
+                        annotator.box_label(xyxy_expanded, label, color=colors(c, True))
+                    plate_img = imc[int(xyxy_expanded[1]):int(xyxy_expanded[3]), int(xyxy_expanded[0]):int(xyxy_expanded[2])]
 
             # Perform OCR on the license plate region
                 if plate_img is not None:
@@ -200,8 +207,8 @@ def run(
                             text = f"Plate: {recognized_plate}"
                             color = (0, 255, 0)  # You can change the color if needed
                             font = cv2.FONT_HERSHEY_SIMPLEX
-                            font_scale = 1
-                            thickness = 2
+                            font_scale = 2
+                            thickness = 3
                             im0 = cv2.putText(im0, text, text_location, font, font_scale, color, thickness, cv2.LINE_AA)
             # Stream results
             im0 = annotator.result()
