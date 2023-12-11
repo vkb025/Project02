@@ -127,6 +127,11 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    
+    # New variables for tracking maximum confidence frame
+    max_confidence = 0.0
+    max_confidence_frame = None
+    
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -160,6 +165,7 @@ def run(
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
+            
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
@@ -196,9 +202,14 @@ def run(
                         annotator.box_label(xyxy_expanded, label, color=colors(c, True))
                     plate_img = imc[int(xyxy_expanded[1]):int(xyxy_expanded[3]), int(xyxy_expanded[0]):int(xyxy_expanded[2])]
 
-            # Perform OCR on the license plate region
+                    # Update max confidence frame
+                    if conf > max_confidence:
+                        max_confidence = conf
+                        max_confidence_frame = im0.copy()
+                        
+                # Perform OCR on the license plate region
                 if plate_img is not None:
-    # Perform OCR on the license plate region
+                # Perform OCR on the license plate region
                     results = reader.readtext(plate_img)
                     if results:
                         recognized_plate = results[0][1]  # Extract recognized text from OCR results
@@ -250,7 +261,14 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+     # Save results (image with detections)
+    if save_img and max_confidence_frame is not None:
+        cv2.imwrite(str(save_dir / 'max_confidence_frame.jpg'), max_confidence_frame)
+        LOGGER.info(f"Maximum confidence frame saved to {colorstr('bold', str(save_dir / 'max_confidence_frame.jpg'))}")
 
+        if exit_on_save:
+            LOGGER.info("Exiting on save...")
+            return  # exit the function when saving the frame
 
 def parse_opt():
     parser = argparse.ArgumentParser()
