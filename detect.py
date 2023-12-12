@@ -1,7 +1,6 @@
 # YOLOv5 🚀 by Ultralytics, AGPL-3.0 license
 """
 Run YOLOv5 detection inference on images, videos, directories, globs, YouTube, webcam, streams, etc.
-
 Usage - sources:
     $ yolov5 detect --weights yolov5s.pt --source 0                              # webcam
                                                      img.jpg                         # image
@@ -13,7 +12,6 @@ Usage - sources:
                                                      'path/*.jpg'                    # glob
                                                      'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                                                      'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
-
 Usage - formats:
     $ yolov5 detect --weights yolov5s.pt                 # PyTorch
                                  yolov5s.torchscript        # TorchScript
@@ -27,32 +25,25 @@ Usage - formats:
                                  yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
                                  yolov5s_paddle_model       # PaddlePaddle
 """
-
 import argparse
 import os
 import platform
 import sys
 from pathlib import Path
-
 import torch
 import easyocr
 from easyocr import Reader
-
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
                            increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
-
-
-
 @smart_inference_mode()
 def run(
         weights='yolov5s.pt',  # model path or triton URL
@@ -92,26 +83,21 @@ def run(
     screenshot = source.lower().startswith('screen')
     if is_url and is_file:
         source = check_file(source)  # download
-
     if imgsz is None and img is None:
         imgsz = 640
     elif img is not None:
         imgsz = img
-
     if isinstance(imgsz, int):
         imgsz = [imgsz, imgsz]
-
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
-
     # Load model
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     reader = easyocr.Reader(['en'])
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
-
     # Dataloader
     bs = 1  # batch_size
     if webcam:
@@ -123,15 +109,9 @@ def run(
     else:
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
     vid_path, vid_writer = [None] * bs, [None] * bs
-
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
-    
-    # New variables for tracking maximum confidence frame
-    max_confidence = 0.0
-    max_confidence_frame = None
-    
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -139,19 +119,15 @@ def run(
             im /= 255  # 0 - 255 to 0.0 - 1.0
             if len(im.shape) == 3:
                 im = im[None]  # expand for batch dim
-
         # Inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
             pred = model(im, augment=augment, visualize=visualize)
-
         # NMS
         with dt[2]:
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
-
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -160,12 +136,10 @@ def run(
                 s += f'{i}: '
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
-
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
-            
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
@@ -175,7 +149,6 @@ def run(
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
-
                 # Print results
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()  # detections per class
@@ -199,17 +172,12 @@ def run(
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy_expanded, label, color=colors(c, True))
+                    annotator.box_label(xyxy_expanded, label, color=colors(c, True))
                     plate_img = imc[int(xyxy_expanded[1]):int(xyxy_expanded[3]), int(xyxy_expanded[0]):int(xyxy_expanded[2])]
 
-                    # Update max confidence frame
-                    if conf > max_confidence:
-                        max_confidence = conf
-                        max_confidence_frame = im0.copy()
-                        
-                # Perform OCR on the license plate region
+            # Perform OCR on the license plate region
                 if plate_img is not None:
-                # Perform OCR on the license plate region
+    # Perform OCR on the license plate region
                     results = reader.readtext(plate_img)
                     if results:
                         recognized_plate = results[0][1]  # Extract recognized text from OCR results
@@ -218,7 +186,7 @@ def run(
                             text = f"Plate: {recognized_plate}"
                             color = (0, 255, 0)  # You can change the color if needed
                             font = cv2.FONT_HERSHEY_SIMPLEX
-                            font_scale = 2
+                            font_scale = 1
                             thickness = 3
                             im0 = cv2.putText(im0, text, text_location, font, font_scale, color, thickness, cv2.LINE_AA)
             # Stream results
@@ -230,7 +198,6 @@ def run(
                     cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
                 cv2.imshow(str(p), im0)
                 cv2.waitKey(1)  # 1 millisecond
-
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == 'image':
@@ -249,10 +216,8 @@ def run(
                         save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer[i].write(im0)
-
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
-
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
@@ -261,15 +226,6 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
-     # Save results (image with detections)
-    if save_img and max_confidence_frame is not None:
-        cv2.imwrite(str(save_dir / 'max_confidence_frame.jpg'), max_confidence_frame)
-        LOGGER.info(f"Maximum confidence frame saved to {colorstr('bold', str(save_dir / 'max_confidence_frame.jpg'))}")
-
-        if exit_on_save:
-            LOGGER.info("Exiting on save...")
-            return  # exit the function when saving the frame
-
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model path or triton URL')
@@ -303,13 +259,9 @@ def parse_opt():
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
     return opt
-
-
 def main():
     opt = parse_opt()
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
-
-
 if __name__ == "__main__":
     main()
